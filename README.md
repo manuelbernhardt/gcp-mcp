@@ -36,9 +36,11 @@ GCP-MCP allows AI assistants and other MCP clients to interact with Google Cloud
 
 ## Available Tools
 
+### Secret Manager Tools
+
 The server provides the following tools for interacting with Google Cloud Secret Manager:
 
-### list_secrets
+#### list_secrets
 
 Lists all secrets in a specified GCP project.
 
@@ -51,7 +53,7 @@ Lists all secrets in a specified GCP project.
 list_secrets(project_id="my-gcp-project", prefix="api-")
 ```
 
-### delete_secret
+#### delete_secret
 
 Deletes a secret from Google Cloud Secret Manager.
 
@@ -64,7 +66,7 @@ Deletes a secret from Google Cloud Secret Manager.
 delete_secret(secret_name="my-api-key", project_id="my-gcp-project")
 ```
 
-### add_secret
+#### add_secret
 
 Adds a new secret or a new version to an existing secret in Google Cloud Secret Manager.
 
@@ -78,9 +80,57 @@ Adds a new secret or a new version to an existing secret in Google Cloud Secret 
 add_secret(secret_name="my-new-api-key", project_id="my-gcp-project", secret_value="supersecretvalue")
 ```
 
-### Usage
+### Cloud Run Tools
 
-#### Configuring for Cursor
+The server provides the following tools for interacting with Google Cloud Run:
+
+#### list_cloud_run_services
+
+Lists all Cloud Run services in a specified GCP project and region.
+
+**Parameters:**
+- `project_id` (string, required): The ID of the GCP project
+- `region` (string, required): The region where services are deployed (e.g., "us-central1", "europe-west3")
+
+**Example:**
+```
+list_cloud_run_services(project_id="my-gcp-project", region="us-central1")
+```
+
+**Response:**
+```
+[
+  {
+    "name": "my-service",
+    "uri": "https://my-service-xyz123-uc.a.run.app"
+  },
+  ...
+]
+```
+
+#### delete_cloud_run_service
+
+Deletes a Cloud Run service from a specified GCP project and region.
+
+**Parameters:**
+- `service_name` (string, required): The name of the service to delete
+- `project_id` (string, required): The ID of the GCP project
+- `region` (string, required): The region where the service is deployed
+
+**Example:**
+```
+delete_cloud_run_service(service_name="my-service", project_id="my-gcp-project", region="us-central1")
+```
+
+**Response:**
+```
+{
+  "status": "success",
+  "message": "Cloud Run service 'my-service' successfully deleted from project 'my-gcp-project' in region 'us-central1'"
+}
+```
+
+## Configuring for Cursor
 
 Create a `mcp.json` file in `~/.cursor/mcp.json`:
 
@@ -93,4 +143,20 @@ Create a `mcp.json` file in `~/.cursor/mcp.json`:
     }
   }
 }
+```
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+python -m unittest test_gcp.py
+
+# Run specific test class
+python -m unittest test_gcp.TestSecretManagerFunctions
+python -m unittest test_gcp.TestCloudRunFunctions
+
+# Run a specific test
+python -m unittest test_gcp.TestSecretManagerFunctions.test_list_secrets
 ```

@@ -1,10 +1,8 @@
-from typing import Any
-import httpx
 from mcp.server.fastmcp import FastMCP
-from google.cloud import secretmanager, core
+from google.cloud import secretmanager, run_v2
+from google.cloud import resourcemanager_v3
 from google.api_core.exceptions import NotFound
 
-# Initialize FastMCP server
 mcp = FastMCP("gcp")
 
 
@@ -25,16 +23,41 @@ async def add_secret(secret_name: str, project_id: str, secret_value: str) -> di
     version_name = await _add_secret(secret_name, project_id, secret_value)
     return {"status": "success", "message": f"Secret '{secret_name}' added/updated in project '{project_id}'. New version: {version_name}"}
 
+@mcp.tool()
+async def get_secret_value(secret_name: str, project_id: str) -> dict[str, str]:
+    """Get a secret value from Google Cloud Secret Manager"""
+    try:
+        value = await _get_secret(secret_name, project_id)
+        return {"status": "success", "value": value}
+    except Exception as e:
+        return {"status": "error", "message": f"Error retrieving secret: {str(e)}"}
 
+@mcp.tool()
+async def list_cloud_run_services(project_id: str, region: str) -> list[dict[str, str]]:
+    """List all Cloud Run services in the specified project and region"""
+    services = await _list_cloud_run_services(project_id, region)
+    return services
+
+@mcp.tool()
+async def delete_cloud_run_service(service_name: str, project_id: str, region: str) -> dict[str, str]:
+    """Delete a Cloud Run service from Google Cloud Run"""
+    result = await _delete_cloud_run_service(service_name, project_id, region)
+    return result
+
+
+#
 # Helper functions for GCP projects
-async def list_projects() -> list[str]:
+#
+async def _list_projects() -> list[str]:
     """List all GCP projects the user has access to"""
-    client = core.Client()
+    client = resourcemanager_v3.ProjectsClient()
     projects = client.list_projects()
-    return [{"name": project.name, "id": project.project_id} for project in projects]
+    return [{"name": project.display_name, "id": project.project_id} for project in projects]
 
+#
 # Helper functions for secret management
-async def get_secret(secret_name: str, project_id: str) -> str:
+#
+async def _get_secret(secret_name: str, project_id: str) -> str:
     """Get a secret from Google Cloud Secret Manager"""
     client = secretmanager.SecretManagerServiceClient()
     name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
@@ -81,6 +104,47 @@ async def _add_secret(secret_name: str, project_id: str, secret_value: str) -> s
             parent=secret.name, payload={"data": payload}
         )
         return version.name
+
+#
+# Helper functions for Cloud Run services
+#
+async def _list_cloud_run_services(project_id: str, region: str) -> list[dict[str, str]]:
+    """List all Cloud Run services in a project and region"""
+    try:
+        client = run_v2.ServicesClient()
+        parent = f"projects/{project_id}/locations/{region}"
+        
+        services = []
+        for service in client.list_services(parent=parent):
+            service_info = {
+                "name": service.name.split("/")[-1],
+                "uri": service.uri if hasattr(service, 'uri') else "N/A",
+            }
+            services.append(service_info)
+        
+        return services
+    except Exception as e:
+        return [{"error": f"Error listing Cloud Run services: {str(e)}"}]
+
+async def _delete_cloud_run_service(service_name: str, project_id: str, region: str) -> dict[str, str]:
+    """Delete a Cloud Run service"""
+    try:
+        client = run_v2.ServicesClient()
+        name = f"projects/{project_id}/locations/{region}/services/{service_name}"
+        
+        # First check if the service exists
+        try:
+            client.get_service(name=name)
+        except NotFound:
+            return {"status": "error", "message": f"Service '{service_name}' not found in project '{project_id}' region '{region}'"}
+        
+        # If service exists, delete it
+        operation = client.delete_service(name=name)
+        # Wait for the operation to complete
+        operation.result()
+        return {"status": "success", "message": f"Service '{service_name}' successfully deleted"}
+    except Exception as e:
+        return {"status": "error", "message": f"Error deleting service: {str(e)}"}
 
 if __name__ == "__main__":
     # Initialize and run the server
