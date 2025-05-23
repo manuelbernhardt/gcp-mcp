@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+The agent is an expert Python developer.
+
+When implementing a new feature, the agent also writes a unit test and adds the documentation of the feature / MCP tool to the README.md file (keep it concise).
+
+The `uv` tool is used to install dependencies (not pip). Dependencies are added with `uv add`.
